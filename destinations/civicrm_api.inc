@@ -151,7 +151,20 @@ class MigrateDestinationCivicrmApi extends MigrateDestinationEntity {
       drupal_set_message("<pre>Params as passed to API".print_r($params,true)."</pre>");
     }
     migrate_instrument_start('civicrm_' . $this->entity . '_import');
-    $apiresult = civicrm_api($this->entity,'create',$params);
+
+    $apiresult = civicrm_api($this->entity, 'create', $params);
+
+    // api3 doesn't return EntityTag ids
+    // to enable rollback fetch now using Api4
+    // (the EntityTag record should be uniquely determined by contact_id and tag_id)
+    if ($this->entity === 'EntityTag' && !empty($params['contact_id']) && $apiresult['added'] ?? FALSE) {
+        $apiresult['id'] = Civi\Api4\EntityTag::get(FALSE)
+          ->addWhere('tag_id', '=', $params['tag_id'])
+          ->addWhere('entity_id', '=', $params['contact_id'])
+          ->addWhere('entity_table', '=', 'civicrm_contact')
+          ->execute()->single()['id'];
+    }
+
     if($this->debug ==1){
       drupal_set_message("<pre>Result from API".print_r($apiresult,true)."</pre>");
     }
